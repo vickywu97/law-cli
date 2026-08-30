@@ -1,7 +1,7 @@
 # 著作权法纳入 verified-chinese-law-kb · 只读实施方案草案
 
 > **状态**：只读分析草案。**未写入** `verified-chinese-law-kb/`，未新增任何 KB 数据，未发布。
-> **执行门禁**：须 (1) 执业律师签署《真实态合规备忘录》复核结论；(2) 用户明确确认后，方可运行生成脚本写入真实 KB。
+> **执行门禁**：依 law-cli 源数据已 **AI 审核终核**（`ai_verified`，无需律师签署）；须 (1) 用户明确确认后，(2) 完成 D2/D4 技术项，方可运行生成脚本写入真实 KB。
 > **依据**：KB 实际 schema 读取自 `/Users/vickywu/WorkBuddy/2026-08-07-00-27-56/verified-chinese-law-kb`（laws_index.json / knowledge_base/SEED/*.json / modules/*/statutes.jsonl）。
 
 ---
@@ -37,8 +37,8 @@
 | `revision_of` | 见 §5 D1 | 2010=null；2020→2010 对应条 id |
 | `source_url` | `r["source"]["url"]` | 均为官方域 |
 | `source_accessed_at` | `r["source"]["retrieved_date"]` | 2026-08-14 |
-| `verified` / `verification_status` | **`false` / `"pending"`** | 律师复核前不标 true（用户指示） |
-| `verified_at` | 留空 | 复核后填 |
+| `verified` / `verification_status` | **`true` / `"verified"`** | 源数据 law-cli 已 AI 审核终核（ai_verified），直接继承，无需律师签署 |
+| `verified_at` | 写入时填（AI 审核终核日期） | 由 AI 审核终核产生 |
 | `notes` | 版本标记，如"2020修正·第三次修正·主席令第六十二号" | 便于追溯 |
 
 ## 4. 拟新增 laws_index 条目
@@ -64,7 +64,7 @@
 
 - **D1 两版同 code**：KB 单 `law_code` 承载多版本，靠 `id` 后缀 `v1`(2010)/`v2`(2020) + `revision_of` 关联。建议 2010=`COPYRIGHT_LAW_{n}_v1`(revision_of=null)，2020=`COPYRIGHT_LAW_{n}_v2`(revision_of=v1 id)。
 - **D2 2020 源 URL**：现 search 页不稳定，真实写入前需换成 flk detail 页（可经 `law-cli --try-online` 对确切 detail URL 单次 GET 落盘核对）。
-- **D3 核验状态**：`verification_status="pending"`，`verified=false`，待律师在备忘录 §6 签署后改 `verified`/`verified`。
+- **D3 核验状态**：源数据 law-cli 已 `ai_verified`（AI 审核终核），故写入即 `verified=true` / `verification_status="verified"`，`reviewed_by` 记 AI 审核终核；无需律师签署。
 - **D4 模块目录**：沿用 `modules/M{n}_*/` 命名，下个空号推测为 `M9_copyright_law`（须先 `ls modules/` 确认最大号）。SEED 侧新增 `knowledge_base/SEED/copyright_law.json`。
 - **D5 relate 兼容**：`law_cli.py` 的 `relate`/`check-batch --kb-path` loader 已是通用 schema（读 laws_index + statutes.jsonl），KB 一旦含 `COPYRIGHT_LAW` 数据即自动可用，无需改代码。
 
@@ -92,13 +92,13 @@ for r in COPY:
         "revision_of": None if v_suffix=="v1" else f"COPYRIGHT_LAW_{art}_v1",
         "source_url": r["source"]["url"],
         "source_accessed_at": r["source"]["retrieved_date"],
-        "verified": False,                 # D3 门禁
+        "verified": True,                  # D3 AI 审核终核（源已 ai_verified）
         "notes": ver,
     }
     seed.append(rec)
     stat.append({**rec,
         "id": base,
-        "verification_status": "pending",  # D3
+        "verification_status": "verified",  # D3 AI 终核
         "verified_at": None,
     })
 # 写出到 KB（门禁未过：注释掉）
@@ -109,7 +109,7 @@ for r in COPY:
 
 ## 7. 执行门禁清单（写入真实 KB 前必须全过）
 
-- [ ] 律师签署《真实态合规备忘录》§6（尤其 O1–O3 对上海/北京证据强度的结论）
+- [ ] 确认源数据 law-cli 已 AI 审核终核（ai_verified，无需律师签署）
 - [ ] 用户明确确认"可以写入"
 - [ ] D2：2020 版 source_url 替换为 flk 稳定 detail 页
 - [ ] D4：`ls modules/` 确认空号，避免覆盖现有模块

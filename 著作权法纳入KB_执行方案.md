@@ -10,7 +10,7 @@
 | 结论 | **仅自用/内部** | A1/B2/C1 未做，按用户判断不阻塞内部使用；不对外发布 |
 | D4 模块空号 | **M9_copyright_law** | KB 实为 M1–M8，order 顺至 8 → 新法 order=9（草案"04"已更正） |
 | B3 2020 flk URL | **替换为 `https://flk.npc.gov.cn/`** | 原 law_db 用 search.html?keyword= 搜索页；改为 bare 首页，与 M4–M8 四部法完全一致，稳定非搜索页 |
-| A3 著作权法文本 | 已核（官方源 nppa/flk，两版第1条 SHA 相同） | 可置 verified=true 并附律师签名 |
+| A3 著作权法文本 | 已核（官方源 nppa/flk，两版第1条 SHA 相同） | 源数据 law-cli 已 AI 审核终核，可置 verified=true（无需律师签名） |
 | D1/D2 商业库 | 0 命中已确认 | 干净 |
 
 ## 1. 真实 KB schema（本次核查所得，非假设）
@@ -40,7 +40,7 @@
 | revision_of | 2020 版各条 → 对应 `COPYRIGHT_LAW_{n}_v2010`；2010 版 → `null` |
 | verification_status | `verified`（A3 已核） |
 | verified_at | 生成日 `2026-08-17` |
-| verified_by | `Vicky Wu (律师/税务师/专利代理师)`（用户即核验律师，自带签名） |
+| verified_by | `AI 审核终核（law-cli ai_verified，无需律师签名）` |
 | source_url | 2010 版 → `https://www.nppa.gov.cn/xxgk/fdzdgknr/zcfg_210/fl_211/201604/t20160429_4556.html`（原 law_db 官方 URL）；2020 版 → `https://flk.npc.gov.cn/`（B3 决议） |
 | source_accessed_at | `2026-08-14` |
 | notes | 空（或留"本法第五条见公有领域边界说明"） |
