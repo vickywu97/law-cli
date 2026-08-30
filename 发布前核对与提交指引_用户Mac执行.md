@@ -1,117 +1,119 @@
-# law-cli 发布前核对与提交指引（用户 Mac 执行）
+# law-cli 提交 / 发布指引（用户 Mac 执行）
 
-> 本文件是给**你（用户）在本机终端**逐步执行的 runbook。
-> 本回合所有改动**当前均为本地 modified / untracked、未 commit**。下面每一步都先 `git status` 复核再动作。
+> 本文件是给**你（用户）在本机终端**逐步操作的 runbook。
+> 仓库最终态已发布完成：Release v1.0 已发、GitHub Pages 已开（`main` 分支 `/docs`）、`main` 分支保护已设为**轻量**（`Require status checks to pass before merging` 已开启，未禁止直接 push）。
 >
-> **口径更新（2026-08-28 用户明确）**：律师**不需要**人工复核签署，**AI 审核即终核**。`review_status=ai_verified` 即视为已审核通过，可直接发布。
+> **口径（2026-08-28 用户明确，全程不变）**：律师**不需要**人工复核签署，**AI 审核即终核**。`review_status=ai_verified` 即视为已审核通过，可直接发布。
 
 ---
 
-## 第 0 步（红线，必须先做）：AI 审核终核确认
+## 一、当前仓库最终态（一眼确认）
 
-本回合 AI 已完成且已实跑验证：
-
-- **全库 219 条 100% AI 审核通过**：`review_status` 全部 `ai_verified`（上海 130 = 65 基线 + 65 修正 / 北京 79 / 著作权 10）。
-- **逐字对账**：每一条均对其官方源（上海 2019 全文 / 北京 2020 全文 / 著作权法 2020 & 2010 总则第 1–5 条官方原文）逐字比对。
-- **数据修复**：北京 12 条（第 49、65–75 条）文本截断损坏，已用官方 2020 全文补全并重算 sha256；上海 2026 版相对 2019 基线仅在 §十一 4 处修正点（第 1/21/37/57 条）有实质改动、0 伪差。
-- **防篡改**：`verify` 报告 219/219 完好、0 篡改。
-- **发布闸门**：`verify --gate` 已改为"仅 `pending` 才拦截"，全库无 `pending`，故 **exit 0（通过）**。
-
-**结论**：证据链完整、AI 审核已终核，无需律师签署即可发布。
-
----
-
-## 第 1 步：进入仓库并复核状态
-
-```bash
-cd /Users/vickywu/WorkBuddy/2026-08-14-14-21-56/projects/law-cli
-git status -sb
-```
-
-预期：看到 `M` 的 README.md / data/law_db.json / law_cli.py / docs/compliance/01_商业库样本隔离说明.md / 核验执行指引_律师操作版.md / 核验自审清单_律师自用.md / 律师复核签署KB_真实态KB.md（注意：实际文件名无"签署"后的下划线，为 `律师复核签署KB_真实态KB.md`），以及 `??` 的一批脚本与文档（见第 3 步清单）。
-请先肉眼确认这些就是你本回合认可的改动，**不要** `git add -A` 一把梭。
-
-## 第 2 步：跑发布闸门（必须在 commit 前）
-
-```bash
-cd /Users/vickywu/WorkBuddy/2026-08-14-14-21-56/projects/law-cli
-/Users/vickywu/.workbuddy/binaries/python/versions/3.13.12/bin/python3 law_cli.py verify
-/Users/vickywu/.workbuddy/binaries/python/versions/3.13.12/bin/python3 law_cli.py verify --gate
-echo "gate exit=$?"
-```
-
-- 第一条：anti-tamper 应 `219 条，被篡改 0 条`。
-- 第二条：`--gate` 应 **exit 0（通过）**——全库 219 条均 `ai_verified`，无 `pending`。
-
-## 第 3 步：暂存指定文件（逐个 add，不用 -A）
-
-```bash
-cd /Users/vickywu/WorkBuddy/2026-08-14-14-21-56/projects/law-cli
-# 稳健做法：用 git add -u 暂存所有"已跟踪且已修改"的文件（避开中文文件名 NFD/NFC 归一化导致的路径匹配失败）
-git add -u
-# 或逐个指定（注意真实文件名为 律师复核签署KB_真实态KB.md，无"签署"后的下划线）：
-# git add README.md data/law_db.json law_cli.py docs/compliance/01_商业库样本隔离说明.md 核验执行指引_律师操作版.md 核验自审清单_律师自用.md "律师复核签署KB_真实态KB.md"
-git add ai_audit_all.py close_O1_shanghai_2026.py fix_lineage_consistency.py fix_shanghai_provenance.py gen_copyright_kb.py ingest_baseline_shanghai_2019.py mark_ai_verified_shanghai2026.py verify_shanghai_a1.py
-git add docs/reports/law-cli_改进诊断与方案.md "docs/reports/上海生活垃圾条例2026修正_AI核对报告.md" "发布前核对与提交指引_用户Mac执行.md" tests/
-git status -sb
-```
-
-复核 `git status`：应只剩你认可的文件在 "Changes to be committed"，无意外文件。（`__pycache__/`、`.pyc` 已被 `.gitignore` 排除。）
-
-## 第 4 步：提交（写明本回合范围）
-
-```bash
-cd /Users/vickywu/WorkBuddy/2026-08-14-14-21-56/projects/law-cli
-git commit -m "law-cli: 根因级改进 + 全库 AI 审核终核（219/219 ai_verified）
-
-- law_cli.py: schema v2 迁移(lineage/review_status); verify --reconcile 官方逐字对账(逐条逐版本+条序校验); verify --gate 改为仅 pending 拦截(AI审核即终核); fetch 来源白名单(移除失效 spcsc.sh.cn, 增 flk.npc.gov.cn); cn_to_int 支持百/千; show 增 --version 过滤
-- ai_audit_all.py: 按 law+version 选官方源逐字对账 + 截断自动补全(北京12条修复) + 不一致保留 pending
-- fix_lineage_consistency.py: 修 2026 版 baseline_version_tag 悬空指针、基线 reconciliation 过度陈述
-- fix_shanghai_provenance.py / ingest_baseline_shanghai_2019.py / mark_ai_verified_shanghai2026.py / close_O1_shanghai_2026.py / gen_copyright_kb.py / verify_shanghai_a1.py: 证据链纠错、2019基线入库、O1 关闭管线等
-- data/law_db.json: 219 条全部 ai_verified, 北京截断修复, 防篡改 219/219 完好
-- tests/test_law_cli.py: 15/15 通过(含 gate / whitelist / show --version 回归)
-- 文档同步: README / 诊断文档 §7.6–§7.7 / 律师操作指引(去除失效 spcsc 引用)"
-```
-
-## 第 5 步：提交后再核验一次
-
-```bash
-cd /Users/vickywu/WorkBuddy/2026-08-14-14-21-56/projects/law-cli
-git status -sb
-/Users/vickywu/.workbuddy/binaries/python/versions/3.13.12/bin/python3 law_cli.py verify | head -1
-/Users/vickywu/.workbuddy/binaries/python/versions/3.13.12/bin/python3 law_cli.py verify --gate; echo "gate exit=$?"
-```
-
-应仍 `219 条，被篡改 0 条` 且 `gate exit=0`。
-
-## 第 6 步：push（如已配置远程）
-
-```bash
-cd /Users/vickywu/WorkBuddy/2026-08-14-14-21-56/projects/law-cli
-git log --oneline -3
-git remote -v
-```
-
-- 若 `git remote -v` 输出为空（当前即如此）：说明本仓**未配置远程**，push 无从谈起。请先在 GitHub 建仓（仓库名 `law-cli`，与本地一致），再 `git remote add origin git@github.com:vickywu97/law-cli.git`（SSH 443 配置见下），然后 `git push -u origin main`。
-- 若已配置远程，直接：
-
-```bash
-cd /Users/vickywu/WorkBuddy/2026-08-14-14-21-56/projects/law-cli
-git push -u origin main
-```
-
-> 若 `git push` 遇 `LibreSSL SSL_connect: Operation timed out` / `HTTP2 framing`：
-> 改用 SSH 走 443——先确认 `~/.ssh/config` 含：
-> ```
-> Host github.com
->   Hostname ssh.github.com
->   Port 443
->   User git
-> ```
-> 且远程为 `git@github.com:vickywu97/law-cli.git`；或临时 `git config --global http.proxy http://127.0.0.1:7890`。push 失败不丢提交，先 `git status -sb` 确认 ahead 数再重试。
+| 项 | 状态 |
+|---|---|
+| 记录数 | **219** 条（上海 130 = 65 基线 + 65 修正 / 北京 79 / 著作权 10） |
+| 审核状态 | 全部 `ai_verified`（AI 终核，无 `pending`、无律师签署） |
+| schema | v2（`lineage` + `review_status`） |
+| 防篡改 | `verify` 报告 219/219 完好、0 篡改 |
+| 单元测试 | 15/15 通过（CI 每次 push/PR 自动跑） |
+| 发布闸门 | `verify --gate` 仅拦截 `pending`，全库无 `pending` → **exit 0** |
+| 许可证 | MIT（`LICENSE` 已存在） |
+| 安装 | `pip install -e .`（纯标准库，无需第三方依赖） |
+| 文档站 | GitHub Pages 已开，首页 `docs/index.md` |
+| 双语 | `README.md`（中）＋ `README_EN.md`（英，含作者三重资质） |
+| 开源礼仪 | `CONTRIBUTING.md` / `SECURITY.md` / `BRANCH_PROTECTION.md` 齐备 |
 
 ---
 
-## O1 状态（已于 2026-08-28 关闭）
+## 二、日常改动的提交流程（轻量分支保护下）
 
-用户提供的 `上海市生活垃圾管理条例_2019通过_全文_官方原文.txt` 经核验即为 2026 修正全文（含 §十一 4 处修订），O1 已据此关闭，无需另寻 canonical 源；`ai_audit_all.py` 已对全库 219 条完成 AI 审核。
+轻量保护**只要求 PR 合入前状态检查通过**，不禁止直接 `git push` 到 `main`。两种走法任选：
+
+### 走法 A — 直接 push（小改动、你已本地自测过）
+```bash
+cd /Users/vickywu/WorkBuddy/2026-08-14-14-21-56/projects/law-cli
+
+# 1) 本地自测（等价于 CI 的 test 作业）
+python3 tests/test_law_cli.py
+python3 law_cli.py verify --gate; echo "gate exit=$?"
+
+# 2) 提交
+git add -A
+git commit -m "docs/fix: <一句话说明本次改动>"
+
+# 3) 推送（轻量保护允许直接 push main）
+git push
+```
+
+### 走法 B — 走 PR（推荐用于非平凡改动，让 CI 先跑）
+```bash
+cd /Users/vickywu/WorkBuddy/2026-08-14-14-21-56/projects/law-cli
+
+# 1) 开特性分支
+git checkout -b feat/<简短描述>
+
+# 2) 改动 + 本地自测
+python3 tests/test_law_cli.py
+python3 law_cli.py verify --gate; echo "gate exit=$?"
+
+# 3) 提交并推送分支
+git add -A
+git commit -m "feat: <说明>"
+git push -u origin feat/<简短描述>
+
+# 4) 在 GitHub 提 PR 到 main → 等 CI(test) 变绿 → Merge
+```
+> 轻量保护下，PR 合入前会强制要求 `test` 状态检查通过；直接 push 不受影响。
+
+---
+
+## 三、发布 / 更新对外产物（已做过，留作复刻参考）
+
+### 1) 发 Release（v1.0 已发，后续发 vX.Y 时）
+- GitHub 仓库 → **Releases → Draft a new release**
+- Tag：`v1.1`（递增），标题：`law-cli v1.1 — AI 终核中文地方法规 CLI`
+- 正文：直接粘贴仓库内 `RELEASE_NOTES.md` 内容（按需更新版本号/计数）
+- 点 **Publish release**
+
+### 2) 更新文档站（GitHub Pages 已开）
+- 文档源即 `main` 分支的 `/docs` 目录，首页 `docs/index.md`。
+- 改完 `docs/` 下任意 `.md` → 提交并 push → Pages 自动重建（约 1–2 分钟）。
+- 站点地图 / 开启步骤见 `docs/SITE_GUIDE.md`。
+
+### 3) 分支保护（当前 = 轻量，已生效）
+- Settings → Branches → `main` → **Require status checks to pass before merging** ✓（已勾选 `test`）
+- 未勾选「Restrict pushes that create files」「Require branches to be up to date」等，故直接 push 仍可用。
+- 完整方案（禁直接 push、强制 PR）见 `docs/BRANCH_PROTECTION.md`，按需升级。
+
+---
+
+## 四、新增一部法 / 一批条文（数据贡献）
+
+1. 从官方源（`flk.npc.gov.cn` / `gov.cn` 系列）人工保存 UTF-8 全文文本到 `seed/`。
+2. 用 `law_cli.py` 子命令入库并做逐字对账：
+   ```bash
+   python3 law_cli.py verify --reconcile   # 与官方种子逐字对账
+   python3 law_cli.py verify              # 防篡改 219+新增/219+新增 完好
+   python3 law_cli.py verify --gate       # 无 pending → exit 0
+   ```
+3. 新增记录默认 `review_status` 经 AI 逐字对账后标 `ai_verified`（**AI 审核即终核**，无需律师签署）。
+4. 补齐 `docs/compliance/05_数据来源与核验记录.md` 对应行 + 在 `RELEASE_NOTES.md` / README 更新计数。
+5. 跑测试、提交、按第二节流程推送。
+
+---
+
+## 五、红线（不可破）
+
+- **数据来源须为政府官方域**（白名单见 `law_cli.py` `OFFICIAL_DOMAINS`：`gov.cn` / `npc.gov.cn` / `flk.npc.gov.cn` / `nppa.gov.cn` / `court.gov.cn`）；商业库（北大法宝/威科/法信）文本仅可作评测样本，**不得**进入 `data/law_db.json`。
+- **不得**出现「待律师复核 / 须律师签署 / 具名签署」等强制表述（口径已统一为 AI 终核）；历史叙述可用「口径更新」横幅说明。
+- **不得**把虚构草稿（`项目构思_虚构草稿.md`，已被 `.gitignore` 排除）混入本真实态仓库。
+- 任何改动合入前，`verify --gate` 必须 exit 0（无 `pending` 残留）。
+
+---
+
+## 附：本机环境提示（非必读）
+- 仓库路径：`/Users/vickywu/WorkBuddy/2026-08-14-14-21-56/projects/law-cli`
+- Python：`python3`（系统 3.8.9 即可，CI 用 3.x 标准库，无第三方依赖）
+- 远程：`origin` → `git@github.com:vickywu97/law-cli.git`
+- 若 `git push` 遇 `LibreSSL SSL_connect: Operation timed out` / `HTTP2 framing`：
+  确认 `~/.ssh/config` 含 `Host github.com / Hostname ssh.github.com / Port 443 / User git`，或临时 `git config --global http.proxy http://127.0.0.1:7890`。push 失败不丢提交，先 `git status -sb` 确认 ahead 数再重试。

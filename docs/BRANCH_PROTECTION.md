@@ -5,6 +5,19 @@
 
 ---
 
+## ✅ 当前生效配置（2026-08-30 已设）
+
+仓库 `main` 分支保护已启用 **轻量方案**：
+
+- ✅ **Require status checks to pass before merging**（已选 `test`）
+- ✅ **Block force pushes**
+- ❌ 未勾选「Require a pull request before merging」→ **直接 `git push` 到 main 仍可用**
+
+> 含义：强制推送被禁；PR 合入前必须 CI(`test`) 通过。直接 push 不受影响（CI 仅作为记录，不硬性拦截）。
+> 日常提交指引见 `发布前核对与提交指引_用户Mac执行.md` 第二节。
+
+---
+
 ## ⚠️ 先读：开启后会改变你的推送习惯
 
 标准分支保护会 **禁止直接 `git push` 到 `main`**。你目前的习惯是「本地 commit 在 main → `git push`」，
