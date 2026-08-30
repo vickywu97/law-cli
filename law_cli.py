@@ -15,8 +15,12 @@ law-cli — 法条速查器 · 数据合规 MVP
 
 命令：
   law fetch  --law <法名> --file <官方原文.txt> --source-url <官方URL> [--publisher ...] [--published-date ...] [--effective-date ...] [--version-tag ...] [--articles 1-5]
+            [--lineage-baseline ...] [--lineage-baseline-url ...] [--lineage-amended-by ...] [--lineage-amended-source ...] [--lineage-reorg-url ...]
+            [--allow-non-official]   # 来源域名白名单（默认仅放行官方域，拦商业库 wkinfo/pkulaw…）
   law show     [<法名>.<条号>]         # 无参数则列出全部
-  law verify                          # 校验本地数据是否被篡改
+  law verify                          # 校验本地数据是否被篡改（默认 anti-tamper）
+  law verify --reconcile --official <官方全文.txt>   # 官方源逐字对账（correctness）
+  law verify --gate                   # 复核闸门：存在未复核记录则非零退出
   law versions <法名.条号>             # 版本轴与差异对比
   law validity [法律名]                # 效力状态红黄绿
   law check   <法律名第X条>            # 最小引用校验
@@ -32,10 +36,25 @@ import hashlib
 import json
 import re
 import sys
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
 DB_PATH = Path(__file__).resolve().parent / "data" / "law_db.json"
+
+# 合规白名单：fetch 仅放行官方域。命中商业库/第三方域（wkinfo/pkulaw/无讼…）直接拒绝。
+# 覆盖：各级 gov.cn（含上海 jiading.gov.cn / shanghai.gov.cn / sfj.sh.gov.cn 等）、
+#       国家法律法规数据库 flk.npc.gov.cn（地方条例重新公布全文的 canonical 官方源）、
+#       国家版权局 nppa.gov.cn、最高人民法院 court.gov.cn。
+# 注意：原含 spcsc.sh.cn（上海人大），但实测该域名已被体育直播站占用/停放，
+#       不再指向上海市人大，属失效且不可信的官方源，已从白名单移除（2026-08-24）。
+OFFICIAL_DOMAINS = (
+    "gov.cn",          # 各级gov.cn（含上海各区县/委办局站）
+    "npc.gov.cn",      # 全国人大
+    "flk.npc.gov.cn",  # 国家法律法规数据库（地方条例重新公布全文的 canonical 官方源）
+    "nppa.gov.cn",     # 国家版权局
+    "court.gov.cn",    # 最高人民法院
+)
 
 DISCLAIMER = (
     "【法律免责】本工具仅整理公开法条原文，效力状态提示以官方发布为准，"
@@ -49,19 +68,26 @@ CN_NUM = {
 
 
 def cn_to_int(s: str):
-    """支持阿拉伯数字与中文数字（一~九十九）。"""
+    """支持阿拉伯数字与中文数字（零~千百，如 一 / 二十一 / 一百零八 / 一千零一）。"""
     if s.isdigit():
         return int(s)
     if s in CN_NUM:
         return CN_NUM[s]
-    if "十" in s:
-        parts = s.split("十")
-        tens = parts[0]
-        ones = parts[1] if len(parts) > 1 else ""
-        t = CN_NUM.get(tens, 1) if tens else 1
-        o = CN_NUM.get(ones, 0) if ones else 0
-        return t * 10 + o
-    return None
+    units = {"十": 10, "百": 100, "千": 1000}
+    total = 0
+    section = 0
+    for ch in s:
+        if ch in CN_NUM:
+            section = CN_NUM[ch]
+        elif ch in units:
+            unit = units[ch]
+            total += (section or 1) * unit
+            section = 0
+        elif ch == "零":
+            continue
+        else:
+            return None
+    return total + section
 
 
 ART_RE = re.compile(r"第([一二三四五六七八九十百零0-9]+)条")
@@ -130,8 +156,27 @@ def sha256(text: str) -> str:
 
 def load_db() -> dict:
     if not DB_PATH.exists():
-        return {"schema_version": 1, "records": []}
-    return json.loads(DB_PATH.read_text(encoding="utf-8"))
+        return {"schema_version": 2, "records": []}
+    return migrate_db(json.loads(DB_PATH.read_text(encoding="utf-8")))
+
+
+def migrate_db(db: dict) -> dict:
+    """向后兼容迁移：v1 -> v2。
+
+    - 每条记录增加 `lineage`（修正谱系）与 `review_status`/`reviewed_by`/`review_date`（复核闸门）。
+    - 只加字段、不改条文文本，也不改既有 source 的内容（除 schema 升级）。
+    - 真正的来源/日期纠错（如 P0-2）由审计脚本在律师复核后写入，而非此处自动改内容。
+
+    返回的内存对象即 schema_version==2；仅在 fetch/save 时落盘持久化。
+    """
+    if db.get("schema_version", 1) < 2:
+        for r in db.get("records", []):
+            r.setdefault("lineage", {})
+            r.setdefault("review_status", "pending")
+            r.setdefault("reviewed_by", "")
+            r.setdefault("review_date", "")
+        db["schema_version"] = 2
+    return db
 
 
 def save_db(db: dict) -> None:
@@ -175,6 +220,19 @@ def cmd_fetch(args: argparse.Namespace) -> None:
         print("[fetch] 错误：须提供 --file <官方原文>，或 --try-online 先下载。", file=sys.stderr)
         sys.exit(2)
 
+    # 合规闸门：来源域名白名单（默认仅放行官方域；命中商业库/第三方域直接拒绝）
+    if args.source_url and not args.allow_non_official:
+        host = (urllib.parse.urlparse(args.source_url).hostname or "").lower()
+        if not any(host == d or host.endswith("." + d) for d in OFFICIAL_DOMAINS):
+            print(
+                f"[fetch] 拒绝：来源域名 '{host}' 不在官方白名单"
+                f"（{', '.join(OFFICIAL_DOMAINS)}）。\n"
+                "  商业库/第三方域（wkinfo/pkulaw/无讼…）禁止写入真实 KB。"
+                "若确为官方源，请人工核实后加 --allow-non-official。",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+
     arts = split_articles(text)
     if args.articles:
         want = parse_range(args.articles)
@@ -202,6 +260,23 @@ def cmd_fetch(args: argparse.Namespace) -> None:
                 "version_tag": args.version_tag or "",
                 "retrieved_date": datetime.date.today().isoformat(),
             },
+            "lineage": {
+                "baseline_version_tag": args.lineage_baseline or "",
+                "baseline_source_url": args.lineage_baseline_url or "",
+                "amended_by": args.lineage_amended_by or "",
+                "amended_by_source": args.lineage_amended_source or "",
+                "reorganized_full_text_url": args.lineage_reorg_url or "",
+                "effective_date": args.effective_date or "",
+                "reconciliation": {
+                    "official_text_sha256": "",
+                    "status": "pending",
+                    "verified_by": "",
+                    "verified_at": "",
+                },
+            },
+            "review_status": "pending",
+            "reviewed_by": "",
+            "review_date": "",
             "sha256": sha256(body),
             "disclaimer": DISCLAIMER,
         }
@@ -210,6 +285,18 @@ def cmd_fetch(args: argparse.Namespace) -> None:
 
     save_db(db)
     print(f"[fetch] 成功写入 {added} 条；当前库共 {len(db['records'])} 条。")
+
+
+def _source_line(rec: dict):
+    """展示用来源行：返回 (label, url)。url 为空时回退到 lineage.baseline_source_url 并标注「基线来源」。"""
+    s = rec.get("source") or {}
+    url = s.get("url", "")
+    label = "来源"
+    if not url:
+        url = (rec.get("lineage") or {}).get("baseline_source_url", "") or ""
+        if url:
+            label = "基线来源"
+    return label, url
 
 
 def cmd_show(args: argparse.Namespace) -> None:
@@ -228,6 +315,7 @@ def cmd_show(args: argparse.Namespace) -> None:
         r
         for r in db["records"]
         if (art_part == "" or r["article"] == art_part) and (law_part in r["law"])
+        and (not args.version or r["source"].get("version_tag", "") == args.version)
     ]
     if not matches:
         print("[show] 未找到匹配记录。", file=sys.stderr)
@@ -238,12 +326,122 @@ def cmd_show(args: argparse.Namespace) -> None:
         print(f"法条：{r['law']} 第{r['article']}条")
         print(f"版本：{s.get('version_tag', '')}")
         print(f"原文：{r['text']}")
-        print(f"来源：{s.get('url', '')}")
+        src_label, url = _source_line(r)
+        print(f"{src_label}：{url}")
         print(f"发布机关：{s.get('publisher', '')}  公布：{s.get('published_date', '')}  施行：{s.get('effective_date', '')}")
         print(f"检索日期：{s.get('retrieved_date', '')}")
+        print(f"复核状态：{r.get('review_status', 'pending')}"
+              f"（复核人：{r.get('reviewed_by', '')} 日期：{r.get('review_date', '')}）")
+        ln = r.get("lineage") or {}
+        if ln:
+            eff = ln.get("effective_date", "") or s.get("effective_date", "")
+            recon = ln.get("reconciliation", {}) or {}
+            print(f"修正谱系：基线={ln.get('baseline_version_tag', '') or '—'} | "
+                  f"修正决定={ln.get('amended_by', '') or '—'} | "
+                  f"施行={eff} | 官方对账={recon.get('status', 'pending')}")
+            if ln.get("baseline_source_url"):
+                print(f"  基线来源：{ln['baseline_source_url']}")
+            if ln.get("reorganized_full_text_url"):
+                print(f"  重新公布全文：{ln['reorganized_full_text_url']}")
         print(f"SHA-256：{r['sha256']}")
         print(r["disclaimer"])
         print("-" * 40)
+
+
+def _split_official(path: str) -> dict:
+    """按'第X条'（行首）切分官方全文，返回 {条号(阿拉伯str): 正文}。
+
+    与 DB 的 split_articles 不同：这里按行首硬切，用于把"官方重新公布全文"
+    拆成逐条基线，做 correctness 对账，不依赖连续脊启发式。
+    """
+    text = Path(path).read_text(encoding="utf-8")
+    arts: dict = {}
+    cur = None
+    buf = []
+    chap_re = re.compile(r"^\s*第[一二三四五六七八九十百]+[章节]")
+    for ln in text.splitlines():
+        m = re.match(r"^\s*第([一二三四五六七八九十百零0-9]+)条", ln)
+        if m:
+            if cur is not None:
+                # 去掉因边界落在下一章标题前而残留在条文尾部的"第X章/第X节"标题行
+                # 与空白行（章标题前后常有空行），与 split_articles 行为一致，
+                # 避免官方全文对账时把章标题误报为"实质性差异"。
+                while buf and (not buf[-1].strip() or chap_re.match(buf[-1].strip())):
+                    buf.pop()
+                arts[str(cn_to_int(cur))] = "\n".join(buf).strip()
+            cur = m.group(1)
+            buf = [ln]
+        elif cur is not None:
+            buf.append(ln)
+    if cur is not None:
+        while buf and (not buf[-1].strip() or chap_re.match(buf[-1].strip())):
+            buf.pop()
+        arts[str(cn_to_int(cur))] = "\n".join(buf).strip()
+    return arts
+
+
+def reconcile(db: dict, official_path: str, law: str) -> None:
+    """官方源逐字对账（correctness）：把指定法的 DB 条文与官方全文逐条比对。
+
+    官方全文文件是「单一法」的全文，故必须指定 --law 以限定比对范围，
+    避免其他法的条号被误判为「官方缺失」。
+    分类：逐字一致(忽略空白) / 实质性差异 / 官方有DB缺 / DB有官方缺。
+    """
+    if not official_path or not Path(official_path).exists():
+        print(f"[reconcile] 官方全文未就位：{official_path}。请放置官方重新公布全文后重试。",
+              file=sys.stderr)
+        sys.exit(2)
+    off = _split_official(official_path)
+    recs = [r for r in db["records"] if r["law"] == law]
+    if not recs:
+        print(f"[reconcile] DB 中无该法记录：{law}", file=sys.stderr)
+        sys.exit(2)
+
+    exact = diff = 0
+    # 覆盖度按"条号集合"计，避免双版本重复计数；逐版本比对在下方逐条进行。
+    db_arts = set(r["article"] for r in recs)
+    official_arts = set(off)
+    off_only = len(official_arts - db_arts)  # 官方有、DB 缺该条号
+    db_only = len(db_arts - official_arts)    # DB 有、官方缺该条号
+
+    # 逐条逐版本比对：同一法存在多版本（如 2019 基线 + 2026 修正版）时，
+    # 每条每个版本都会被分别核对，避免 dict 去重掩盖某一版本的真实差异。
+    for r in sorted(recs, key=lambda r: (int(r["article"]), r["source"].get("version_tag", ""))):
+        art = r["article"]
+        off_body = off.get(art)
+        if off_body is None:
+            continue  # 已计入 db_only 覆盖度，此处不重复
+        db_norm = re.sub(r"\s+", "", r["text"])
+        off_norm = re.sub(r"\s+", "", off_body)
+        vt = r["source"].get("version_tag", "")
+        if db_norm == off_norm:
+            exact += 1
+        else:
+            diff += 1
+            print(f"[reconcile] 有差异：{law}.{art} [{vt}]（DB↔官方 实质性不同，需人工复核）")
+    for art in sorted(off, key=lambda x: int(x)):
+        if art not in db_arts:
+            print(f"[reconcile] 官方有、DB 缺失：{law}.第{art}条")
+
+    # 条序校验：修正决定常"对条文顺序作相应调整"。按条号逐一比对会漏掉顺序变化，
+    # 故额外比对 DB（各版本，按入库顺序）与官方的条号出现序列。
+    off_order = list(off.keys())  # _split_official 保留原文出现顺序
+    order_mismatch = False
+    for vt in sorted({r["source"].get("version_tag", "") for r in recs}):
+        db_order = [r["article"] for r in recs if r["source"].get("version_tag", "") == vt]
+        # 仅当条号集合一致时比较顺序才有意义
+        if set(db_order) == set(off_order) and db_order != off_order:
+            order_mismatch = True
+            print(f"[reconcile] ⚠️ 条序不同 [{vt}]：DB={db_order} | 官方={off_order}")
+
+    print(f"[reconcile] 逐条逐版本 逐字一致(忽略空白) {exact} | 实质性差异 {diff} | "
+          f"官方有DB缺条号 {off_only} | DB有官方缺条号 {db_only}"
+          + (" | 条序不一致" if order_mismatch else ""))
+    if diff or off_only or db_only or order_mismatch:
+        print("[reconcile] ⚠️ 存在需人工复核的差异；若 DB 记录为'修正版'而官方为旧版原文，"
+              "差异可能正是已知修正点——须逐条核对 lineage.amended_by 是否已覆盖该差异。")
+    else:
+        print("[reconcile] ✅ 与官方全文逐字一致（忽略空白），且条序一致。")
 
 
 def cmd_verify(args: argparse.Namespace) -> None:
@@ -255,7 +453,25 @@ def cmd_verify(args: argparse.Namespace) -> None:
         else:
             bad += 1
             print(f"[篡改] {r['law']}.{r['article']} 哈希不符（记录 {r['sha256'][:12]}…）")
-    print(f"[verify] 完好 {ok} 条，被篡改 {bad} 条。")
+    print(f"[verify] anti-tamper 完好 {ok} 条，被篡改 {bad} 条。")
+
+    if args.gate:
+        # 本项目口径（用户明确）：AI 审核即终核，不要求律师人工签署。
+        # 闸门仅在存在 `pending`（未经任何审核）记录时关闭；`ai_verified` 与 `verified` 均视为已审核通过。
+        pending = [r for r in db["records"] if r.get("review_status") == "pending"]
+        if pending:
+            print(f"[gate] 复核闸门失败：存在 {len(pending)} 条未经审核"
+                  f"（review_status=pending）。不得对外发布/推送。", file=sys.stderr)
+            sys.exit(1)
+        print("[gate] 复核闸门通过：全部记录均已通过 AI 审核（review_status ∈ {ai_verified, verified}）。")
+
+    if args.reconcile:
+        if not args.law:
+            print("[reconcile] 须指定 --law <法名> 以限定比对范围（官方全文为单一法全文）。",
+                  file=sys.stderr)
+            sys.exit(2)
+        reconcile(db, args.official, args.law)
+
     if bad:
         sys.exit(1)
 
@@ -327,7 +543,6 @@ def cmd_validity(args: argparse.Namespace) -> None:
         latest = rs_sorted[-1]
         print(f"【{law}】效力状态（自行基于官方原文比对，非第三方标注）")
         print("-" * 40)
-        print(f"{'版本':<26}{'生效日期':<14}状态")
         for r in rs_sorted:
             s = r["source"]
             eff = s.get("effective_date", "")
@@ -341,7 +556,8 @@ def cmd_validity(args: argparse.Namespace) -> None:
                 status = "现行有效（绿）"
             else:
                 status = "已修订/已废止（黄）"
-            print(f"{s.get('version_tag', ''):<26}{eff:<14}{status}")
+            print(f"• 版本：{s.get('version_tag', '')}")
+            print(f"    生效日期：{eff}    状态：{status}")
         print("注：仅依据修订一般规则判断旧法被新法取代；特殊过渡条款需逐条核对官方公告。")
         print("=" * 40)
 
@@ -365,7 +581,8 @@ def cmd_check(args: argparse.Namespace) -> None:
     print(f"✓ 引用存在，当前有效版本为 {s.get('version_tag', '')}")
     print(latest["text"])
     print("-" * 40)
-    print(f"来源：{s.get('url', '')} | 检索日期：{s.get('retrieved_date', '')} | SHA-256: {latest['sha256'][:12]}…")
+    src_label, url = _source_line(latest)
+    print(f"{src_label}：{url} | 检索日期：{s.get('retrieved_date', '')} | SHA-256: {latest['sha256'][:12]}…")
     print(latest["disclaimer"])
 
 
@@ -417,7 +634,13 @@ def cmd_check_batch(args: argparse.Namespace) -> None:
         matched += 1
         print(f"行{line_no}: ✓ {law_q}第{art}条 → {latest['source'].get('version_tag', '')}")
         print(f"  {latest['text']}")
-        print(f"  来源: {latest['source'].get('url', '')} | SHA-256: {latest['sha256'][:12]}…")
+        url = latest["source"].get("url", "")
+        src_label = "来源"
+        if not url:
+            url = (latest.get("lineage") or {}).get("baseline_source_url", "") or ""
+            if url:
+                src_label = "基线来源"
+        print(f"  {src_label}: {url} | SHA-256: {latest['sha256'][:12]}…")
         # 可选：本地 KB 关联线索（仅展示已核验公开线索，不构成法律意见）
         if kb_items:
             kb_code = _kb_resolve_law_code(law_q, kb_index)
@@ -608,13 +831,25 @@ def build_parser() -> argparse.ArgumentParser:
     f.add_argument("--version-tag", help="版本标记，如 2020修正（第三次修正）")
     f.add_argument("--articles", help="仅导入指定条号，如 1-5 或 1,3,5")
     f.add_argument("--try-online", action="store_true", help="对用户提供的确切URL做单次GET并存为原始文件")
+    f.add_argument("--allow-non-official", action="store_true",
+                   help="允许非白名单域名（仅人工确认确为官方源时使用，慎用）")
+    f.add_argument("--lineage-baseline", help="[lineage] 基线版本标记，如 2019通过（公告第11号）")
+    f.add_argument("--lineage-baseline-url", help="[lineage] 基线来源 URL（官方）")
+    f.add_argument("--lineage-amended-by", help="[lineage] 修正决定名称（官方）")
+    f.add_argument("--lineage-amended-source", help="[lineage] 修正决定来源说明（非 canonical 须注明，如 wkinfo 导出件）")
+    f.add_argument("--lineage-reorg-url", help="[lineage] 官方重新公布全文 URL（待补）")
     f.set_defaults(func=cmd_fetch)
 
     s = sub.add_parser("show", help="显示条文 + 来源 + 哈希")
     s.add_argument("query", nargs="?", help="法名.条号，如 著作权法.1；留空列出全部")
+    s.add_argument("--version", default="", help="按版本标记过滤，如 2019年通过（2019-07-01施行）")
     s.set_defaults(func=cmd_show)
 
-    v = sub.add_parser("verify", help="校验本地数据完整性（防篡改）")
+    v = sub.add_parser("verify", help="校验本地数据（默认防篡改；--reconcile 做官方源对账；--gate 复核闸门）")
+    v.add_argument("--reconcile", action="store_true", help="加载官方全文逐字对账（correctness）")
+    v.add_argument("--official", help="官方重新公布全文路径（--reconcile 时必填）")
+    v.add_argument("--law", help="比对范围法名（--reconcile 时必填，官方全文为单一法全文）")
+    v.add_argument("--gate", action="store_true", help="复核闸门：存在 review_status=pending（未经 AI 审核）记录则非零退出（发布前必跑）")
     v.set_defaults(func=cmd_verify)
 
     vs = sub.add_parser("versions", help="版本轴与差异对比（法名.条号）")

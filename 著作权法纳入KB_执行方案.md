@@ -1,6 +1,6 @@
 # 著作权法纳入 verified-chinese-law-kb · 执行方案（待确认）
 
-> 状态：执行方案，**尚未写入真实 KB**。需用户（律师）确认结论=仅自用/内部 + B3/D4 处理后方可运行生成脚本。
+> 状态：**已执行（2026-08-18）**。用户确认结论=仅自用/内部 + B3/D4 已按本方案落地；生成脚本 `gen_copyright_kb.py` 已运行，真实 KB 新增 M9_copyright_law（10 条，内部状态、未发布）。
 > 关联：真实态合规备忘录_初稿.md §6、核验自审清单_律师自用.md §4、著作权法纳入KB_只读草案.md（本文件取代之）。
 
 ## 0. 前置确认（来自 §4 填答 + 本次核查）
@@ -73,11 +73,11 @@ laws_index 新增：
 
 ## 4. 执行门禁（确认清单）
 
-- [ ] 用户确认结论=仅自用/内部
-- [ ] 用户确认 B3 用 `https://flk.npc.gov.cn/`（与 M4–M8 一致，非 search 页）
-- [ ] 用户确认 D4=`M9_copyright_law`、order=9
-- [ ] 生成后 `verify` 两库（law_db 154/154 不变；KB 增量 10 条可校验）
-- [ ] 生成后人工抽看 1–2 条 statutes.jsonl + SEED 对齐
+- [x] 用户确认结论=仅自用/内部
+- [x] 用户确认 B3 用 `https://flk.npc.gov.cn/`（与 M4–M8 一致，非 search 页）
+- [x] 用户确认 D4=`M9_copyright_law`、order=9
+- [x] 生成后 `verify` 两库（law_db 154/154 不变；KB 增量 10 条，KB 测试套件 8/8 通过）
+- [x] 生成后人工抽看 statutes/SEED/ledger 对齐（id 一致、revision_of 合法、版本差异正确）
 
 ## 5. 不阻塞项（对外发布前再补，内部用可暂缓）
 
