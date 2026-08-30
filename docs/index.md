@@ -38,11 +38,12 @@ python3 law_cli.py versions "上海市生活垃圾管理条例"  # 版本轴 + d
 - [合规执行检查表](compliance/06_执行检查表.md) — 待办闭环跟踪
 - [合规档案索引](compliance/README.md)
 
-### 工程与溯源
-- [彻底改进诊断与方案](https://github.com/vickywu97/law-cli/blob/main/law-cli_改进诊断与方案.md) — 根因级审查与再架构（含 §7.7 AI 终核决策）
-- [上海市生活垃圾管理条例（2026 修正）AI 核对报告](https://github.com/vickywu97/law-cli/blob/main/上海生活垃圾条例2026修正_AI核对报告.md) — 上海 2026 修正版逐字对账记录
-- [地方性法规官方源调研](https://github.com/vickywu97/law-cli/blob/main/地方性法规官方源调研.md) — 北京 / 上海两省官方源接入与证据链
-- [著作权法纳入 KB 执行方案](https://github.com/vickywu97/law-cli/blob/main/著作权法纳入KB_执行方案.md) — 著作权法对接 `verified-chinese-law-kb` 的方案
+### 工程与溯源（docs/reports/）
+- [彻底改进诊断与方案](https://github.com/vickywu97/law-cli/blob/main/docs/reports/law-cli_改进诊断与方案.md) — 根因级审查与再架构（含 §7.7 AI 终核决策）
+- [上海市生活垃圾管理条例（2026 修正）AI 核对报告](https://github.com/vickywu97/law-cli/blob/main/docs/reports/上海生活垃圾条例2026修正_AI核对报告.md) — 上海 2026 修正版逐字对账记录
+- [地方性法规官方源调研](https://github.com/vickywu97/law-cli/blob/main/docs/reports/地方性法规官方源调研.md) — 北京 / 上海两省官方源接入与证据链
+- [著作权法纳入 KB 执行方案](https://github.com/vickywu97/law-cli/blob/main/docs/reports/著作权法纳入KB_执行方案.md) — 著作权法对接 `verified-chinese-law-kb` 的方案
+- [English README](https://github.com/vickywu97/law-cli/blob/main/README_EN.md) — 英文版说明（面向国际招聘方）
 
 ---
 

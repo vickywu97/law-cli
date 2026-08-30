@@ -1,7 +1,13 @@
 # law-cli · 法条速查器（数据合规 MVP）
 
+[![CI](https://github.com/vickywu97/law-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/vickywu97/law-cli/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://vickywu97.github.io/law-cli/)
+[![README in English](https://img.shields.io/badge/README-English-blue)](README_EN.md)
+
 > **✅ 真实态声明（真实可复现数据项目）**
-> 本仓库现为**真实可复现数据项目**：法条原文取自官方公开渠道（依《著作权法》第五条属公共领域），每条固定完整证据链（来源URL / 公布·施行日期 / 检索日期 / SHA-256），可离线复现。各法规"核验状态"见《地方性法规官方源调研.md》§2.1 / §2.2。
+> 本仓库现为**真实可复现数据项目**：法条原文取自官方公开渠道（依《著作权法》第五条属公共领域），每条固定完整证据链（来源URL / 公布·施行日期 / 检索日期 / SHA-256），可离线复现。各法规"核验状态"见《docs/reports/地方性法规官方源调研.md》§2.1 / §2.2。
 > 用户（律师/税务师/专利代理师）专业资质不为本工具输出增信；官方版本认定与效力提示以官方发布为准。
 
 > **⚠️ A 类 · 法律免责**
@@ -27,7 +33,7 @@ law-cli 是"法条速查器"的**数据层最小闭环**：先解决最敏感的
 
 > ⚠️ **来源合规警示（实测）**：从第三方商业库（如威科先行 wkinfo）导出的 `.doc`/`.pdf` 虽含法条原文（公共领域），但内嵌其专属超链接、`时效性`标注等增值内容，属红线4禁止复制范围。本工具一律以**官方数据库（flk.npc.gov.cn）**为 `source-url`，绝不采用商业库导出件作为来源。
 
-示例数据：以《著作权法》第1–5条演示，含 **2010 修正**与 **2020 修正**两个官方原文版本（均公共领域，人工保存自官方渠道导入），共 10 条记录。另附 `地方性法规官方源调研.md`（已完成北京、上海两省试点与官方源核验）。
+示例数据：以《著作权法》第1–5条演示，含 **2010 修正**与 **2020 修正**两个官方原文版本（均公共领域，人工保存自官方渠道导入），共 10 条记录。另附 `docs/reports/地方性法规官方源调研.md`（已完成北京、上海两省试点与官方源核验）。
 
 ## 为什么这样切
 
@@ -128,7 +134,7 @@ python3 law_cli.py fetch \
 #   要点：来源锁定省级官方站（beijing.gov.cn·主动公开；canonical=bjrd.gov.cn 人大公报PDF，
 #         其 SHA-256 已记录为 provenance 标记）；法规原文依《著作权法》第五条属公共领域，
 #         可合法使用；全程不碰任何商业库。robots 核查：beijing.gov.cn 仅 Disallow /sd。
-#   试点结果：导入 79 条，DB 现共 219 条（含著作权法10 + 上海130），verify 219/219 完好；详见 地方性法规官方源调研.md。
+#   试点结果：导入 79 条，DB 现共 219 条（含著作权法10 + 上海130），verify 219/219 完好；详见 docs/reports/地方性法规官方源调研.md。
 ```
 
 

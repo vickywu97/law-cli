@@ -52,7 +52,7 @@ git add -u
 # 或逐个指定（注意真实文件名为 律师复核签署KB_真实态KB.md，无"签署"后的下划线）：
 # git add README.md data/law_db.json law_cli.py docs/compliance/01_商业库样本隔离说明.md 核验执行指引_律师操作版.md 核验自审清单_律师自用.md "律师复核签署KB_真实态KB.md"
 git add ai_audit_all.py close_O1_shanghai_2026.py fix_lineage_consistency.py fix_shanghai_provenance.py gen_copyright_kb.py ingest_baseline_shanghai_2019.py mark_ai_verified_shanghai2026.py verify_shanghai_a1.py
-git add law-cli_改进诊断与方案.md "上海生活垃圾条例2026修正_AI核对报告.md" "发布前核对与提交指引_用户Mac执行.md" tests/
+git add docs/reports/law-cli_改进诊断与方案.md "docs/reports/上海生活垃圾条例2026修正_AI核对报告.md" "发布前核对与提交指引_用户Mac执行.md" tests/
 git status -sb
 ```
 
