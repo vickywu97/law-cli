@@ -76,7 +76,7 @@ laws_index 新增：
 - [x] 用户确认结论=仅自用/内部
 - [x] 用户确认 B3 用 `https://flk.npc.gov.cn/`（与 M4–M8 一致，非 search 页）
 - [x] 用户确认 D4=`M9_copyright_law`、order=9
-- [x] 生成后 `verify` 两库（law_db 154/154 不变；KB 增量 10 条，KB 测试套件 8/8 通过）
+- [x] 生成后 `verify` 两库（law_db 219/219 不变；KB 增量 10 条，KB 测试套件 8/8 通过）
 - [x] 生成后人工抽看 statutes/SEED/ledger 对齐（id 一致、revision_of 合法、版本差异正确）
 
 ## 5. 不阻塞项（对外发布前再补，内部用可暂缓）
