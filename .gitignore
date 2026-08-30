@@ -11,6 +11,15 @@ data/*.bak*
 # 虚构构思草稿（本仓声明为"真实态"，不得混入虚构内容）
 项目构思_虚构草稿.md
 
+# Python 打包 / 虚拟环境（pyproject.toml 引入后由 pip install 生成）
+*.egg-info/
+.eggs/
+build/
+dist/
+venv/
+.venv/
+.env
+
 # 合规备忘录的冗余渲染版（仅保留 _初稿.md 正本）
 真实态合规备忘录_审阅版.html
 真实态合规备忘录_送律师版.txt
