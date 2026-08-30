@@ -27,6 +27,8 @@ python3 law_cli.py versions "上海市生活垃圾管理条例"  # 版本轴 + d
 
 ## 文档导航
 
+> 文档站开启与结构见 [站点说明（SITE_GUIDE）](SITE_GUIDE.md)。
+
 ### 合规与核验（核心可信度记录）
 - [AI 审核终核声明](compliance/03_AI审核终核声明.md) — 219/219 `ai_verified` 的审核范围、方式与开放项结论
 - [数据来源与核验记录](compliance/05_数据来源与核验记录.md) — 每部法的来源域、核验方式、SHA
