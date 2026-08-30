@@ -52,6 +52,19 @@ law-cli 是"法条速查器"的**数据层最小闭环**：先解决最敏感的
 
 ## 快速开始（零依赖，仅标准库）
 
+### 安装（可选，可复现 / 更专业）
+
+```bash
+git clone https://github.com/vickywu97/law-cli.git
+cd law-cli
+pip install -e .          # 需要联网拉取 setuptools 构建后端；装后可用 `law-cli` 命令
+law-cli verify --gate     # 等价于 python3 law_cli.py verify --gate
+```
+
+> 不装也可用：`python3 law_cli.py <子命令>` 直接跑（纯标准库，DB 路径锚定模块目录，任意 CWD 均可）。
+
+### 直接用（零安装）
+
 ```bash
 # 0) 准备：从国家法律法规数据库人工保存某法官方原文为 UTF-8 文本
 # 1) 记录（fetch）—— 手动导入官方原文，工具补全证据链

@@ -24,6 +24,7 @@ GitHub Pages 沙箱无法自动配置，需你在 GitHub Web UI 手动开启一�
 law-cli 文档站（/docs）
 ├── index.md                         ← 首页：数据现状 + 快速开始 + 导航
 ├── SITE_GUIDE.md                    ← 本文件：开启步骤 + 站点地图
+├── BRANCH_PROTECTION.md             ← main 分支保护配置说明（Web UI + gh CLI）
 └── compliance/                      ← 核心可信度记录
     ├── README.md                    ← 合规档案索引
     ├── 01_商业库样本隔离说明.md      ← 与商业库（北大法宝/威科等）的接触史与隔离政策
